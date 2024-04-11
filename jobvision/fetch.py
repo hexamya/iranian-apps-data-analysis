@@ -41,5 +41,5 @@ while True:
     except Exception as err:
         print(err)
 
-with open(f"rawdata/jobvision.json", "w", encoding="utf-8") as fp:
+with open(f"rawdata/jobvision{int(time.time())}.json", "w", encoding="utf-8") as fp:
     json.dump(items, fp, ensure_ascii=False, indent=4)
