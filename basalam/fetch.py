@@ -15,32 +15,34 @@ session = requests.Session()
 # })
 
 items = []
-from_ = 0
-while True:
-    try:
-        respnose = session.get(
-            "https://search.basalam.com/ai-engine/api/v2.0/product/search",
-            params={
-                "from": from_,
-                "q": "",
-                "dynamicFacets": True,
-                "size": 1000,
-                "adsImpressionDisable": False,
-                "exp_ws": 0,
-                "filters.isExists": True
-            },
-        )
-        if respnose.text == '"Not Found"':
-            break
-        products = respnose.json()['products']
-        from_ += len(products)
-        items += products
+for cat in range(1,13):
+    from_ = 0
+    while True:
+        try:
+            respnose = session.get(
+                "https://search.basalam.com/ai-engine/api/v2.0/product/search",
+                params={
+                    "from": from_,
+                    "f.cat": cat,
+                    # "q": "",
+                    "dynamicFacets": True,
+                    "size": 1000,
+                    "adsImpressionDisable": False,
+                    "exp_ws": 0,
+                    "filters.isExists": True
+                },
+            )
+            if respnose.text == '"Not Found"':
+                break
+            products = respnose.json()['products']
+            from_ += len(products)
+            items += products
 
-        if not products:
-            break
-    except Exception as err:
-        print(err)
-        print(len(items))
+            if not products:
+                break
+        except Exception as err:
+            print(err)
+            print(len(items))
 
-with open(f"basalam/rawData/basalam{int(time.time())}.json", "w", encoding="utf-8") as fp:
+with open(f"rawData/basalam{int(time.time())}.json", "w", encoding="utf-8") as fp:
     json.dump(items, fp, ensure_ascii=False, indent=4)
