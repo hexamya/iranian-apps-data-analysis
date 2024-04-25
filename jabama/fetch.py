@@ -1,6 +1,11 @@
-import json
-import time
+from utils.database import iranian_ecommerce_db
+from pymongo.write_concern import WriteConcern
 import requests
+
+
+db = iranian_ecommerce_db()
+
+jabama_residences_collection = db.jabama_residences
 
 
 session = requests.Session()
@@ -15,26 +20,25 @@ session.headers.update({
 })
 
 types = ['villas', 'cottage', 'ecotourism', 'pool', 'coastal', 'apartment']
-items = []
+
 for item_type in types:
     page = 1
     while True:
         try:
             respnose = session.post(
                 f"https://gw.jabama.com/api/v4/keyword/all-{item_type}?allowEmptyCity=true&hasUnitRoom=true&guarantees=false&platform=desktop",
-                data=f'{{"page-size":16, "page-number":{page}}}',
+                json={
+                    "page-size": 16,
+                    "page-number": page
+                },
             )
             data = respnose.json()['result']
-            page_break = data['total'] // 16 + 1
-            items += data['items']
+            page_break = (data['total'] // 16) + (data['total'] % 16 > 0)
+            jabama_residences_collection.with_options(write_concern=WriteConcern(w=0)).insert_many(data['items'], ordered=False)
 
-            if page > page_break:
+            if page >= page_break:
                 break
             else:
                 page += 1
-                time.sleep(1)
         except Exception as err:
             print(err)
-
-with open(f"rawdata/jabama{int(time.time())}.json", "w", encoding="utf-8") as fp:
-    json.dump(items, fp, ensure_ascii=False, indent=4)

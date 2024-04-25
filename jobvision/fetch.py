@@ -1,7 +1,11 @@
-import json
-import time
+from utils.database import iranian_ecommerce_db
+from pymongo.write_concern import WriteConcern
 import requests
 
+
+db = iranian_ecommerce_db()
+
+jobvision_jobs_collection = db.jobvision_jobs
 
 session = requests.Session()
 
@@ -21,25 +25,25 @@ pre_response = session.get(
 
 session.headers.update(pre_response.request.headers)
 
-items = []
 page = 0
 while True:
     try:
         respnose = session.post(
             "https://candidateapi.jobvision.ir/api/v1/JobPost/List",
-            data=f'{{"pageSize": 30,"requestedPage": {page},"sortBy": 1,"searchId": null}}',
+            json={
+                "pageSize": 30,
+                "requestedPage": page,
+                "sortBy": 1,
+                "searchId": None,
+            }
         )
         data = respnose.json()['data']
-        page_break = data['jobPostCount'] // 30 + 1
-        items += data['jobPosts']
+        page_break = (data['jobPostCount'] // 30) + (data['jobPostCount'] % 30 > 0)
+        jobvision_jobs_collection.with_options(write_concern=WriteConcern(w=0)).insert_many(data['jobPosts'], ordered=False)
 
-        if page > page_break:
+        if page >= page_break:
             break
         else:
             page += 1
-            time.sleep(1)
     except Exception as err:
         print(err)
-
-with open(f"rawdata/jobvision{int(time.time())}.json", "w", encoding="utf-8") as fp:
-    json.dump(items, fp, ensure_ascii=False, indent=4)
