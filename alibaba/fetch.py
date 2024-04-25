@@ -6,8 +6,8 @@ import re
 
 db = iranian_ecommerce_db()
 
-alibaba_train_tickets_collection = db.alibaba_train_tickets
-alibaba_flight_tickets_collection = db.alibaba_flight_tickets
+alibaba_trains_collection = db.alibaba_trains
+alibaba_flights_collection = db.alibaba_flights
 
 flight_cities = ["THR", "AWZ", "SYZ", "MHD", "BND", "IFN", "TBZ", "KIH"]
 train_cities = ["THR", "MHD", "AZD", "BND", "QUM", "TBZ", "KER", "SYZ", "AWZ", "IFN"]
@@ -50,7 +50,7 @@ def train():
                             raise Exception(re.search(r"'>(.+?)</", error).group())
                         tickets = response['departing']
                         if tickets:
-                            alibaba_train_tickets_collection.with_options(write_concern=WriteConcern(w=0)).insert_many(tickets, ordered=False)
+                            alibaba_trains_collection.with_options(write_concern=WriteConcern(w=0)).insert_many(tickets, ordered=False)
                         break
 
                     except Exception as err:
@@ -62,7 +62,7 @@ def train():
 
 def flight():
     skipper = lambda origin, destination, departureDate: all([origin == 'AZD', destination == 'BND', departureDate == '2024-04-29'])
-    skip = True
+    skip = False
     for origin in flight_cities:
         for destination in flight_cities:
             if origin == destination:
@@ -78,22 +78,24 @@ def flight():
                             break
 
                         token = session.post(
-                            'https://ws.alibaba.ir/api/v1/flights/domsetic/available',
+                            'https://ws.alibaba.ir/api/v1/flights/domestic/available',
                             json={
                                 "adult": 1,
                                 "child": 0,
-                                "infant": 0,
                                 "departureDate": departureDate,
                                 "destination": destination,
+                                "infant": 0,
                                 "origin": origin,
                             }).json()['result']['requestId']
 
                         print(token)
                         response = session.get('https://ws.alibaba.ir/api/v1/flights/domestic/available/' + token).json()
-                        if error := response.get('error', {}).get('message'):
-                            raise Exception(re.search(r"'>(.+?)</", error).group())
-                        tickets = response.get('departing')
-                        alibaba_flight_tickets_collection.with_options(write_concern=WriteConcern(w=0)).insert_many(tickets, ordered=False)
+                        print(response)
+                        if error := response.get('error', {}):
+                            raise Exception(re.search(r"'>(.+?)</", error.get('message')).group())
+                        tickets = response.get('result').get('departing')
+                        if tickets:
+                            alibaba_flights_collection.with_options(write_concern=WriteConcern(w=0)).insert_many(tickets, ordered=False)
                         break
 
                     except Exception as err:
@@ -105,4 +107,4 @@ def flight():
 
 
 if __name__ == "__main__":
-    train()
+    flight()
