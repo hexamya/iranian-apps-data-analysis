@@ -10,8 +10,9 @@ basalam_products_collection = db.basalam_products
 
 session = requests.Session()
 
-for cat in range(1, 13):
+for cat in range(1, 1015):
     from_ = 0
+    retry = 0
     while True:
         try:
             respnose = session.get(
@@ -30,10 +31,12 @@ for cat in range(1, 13):
             if respnose.text == '"Not Found"':
                 break
             products = respnose.json()['products']
-            from_ += len(products)
             if not products:
                 break
             basalam_products_collection.with_options(write_concern=WriteConcern(w=0)).insert_many(products, ordered=False)
-
+            from_ += len(products)
         except Exception as err:
-            print(err)
+            print(cat, from_)
+            if retry >= 3:
+                break
+            retry += 1

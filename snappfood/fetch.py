@@ -28,42 +28,51 @@ session.headers.update({
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:102.0) Gecko/20100101 Firefox/102.0",
 })
 
-page = 1
-while True:
-    try:
-        respnose = session.get(
-            f"https://snappfood.ir/search/api/v1/desktop/vendors-list",
-            params={
-                "page": page-1,
-                "page_size": 10000,
-                "sp_alias": "restaurant",
-                "city_name": "Tehran",
-            }
-        )
-        data = respnose.json()['data']
-        page_break = (data['count'] // 10000) + (data['count'] % 10000 > 0)
-        vendors = list(map(lambda item: item['data'], data['finalResult']))
-        snappfood_vendors_collection.with_options(write_concern=WriteConcern(w=0)).insert_many(vendors, ordered=False)
-        if page >= page_break:
-            break
-        else:
-            page += 1
-    except Exception as err:
-        print(err)
+def vendors():
+    page = 1
+    while True:
+        try:
+            respnose = session.get(
+                f"https://snappfood.ir/search/api/v1/desktop/vendors-list",
+                params={
+                    "page": page-1,
+                    "page_size": 10000,
+                    "sp_alias": "restaurant",
+                    "city_name": "Tehran",
+                }
+            )
+            data = respnose.json()['data']
+            page_break = (data['count'] // 10000) + (data['count'] % 10000 > 0)
+            vendors = list(map(lambda item: item['data'], data['finalResult']))
+            if vendors:
+                snappfood_vendors_collection.with_options(write_concern=WriteConcern(w=0)).insert_many(vendors, ordered=False)
+            if page >= page_break:
+                break
+            else:
+                page += 1
+        except Exception as err:
+            print(1, err)
 
-for vendor in vendors:
-    try:
-        respnose = session.get(
-            f"https://snappfood.ir/mobile/v2/restaurant/details/dynamic",
-            params={
-                "optionalClient": "WEBSITE",
-                "vendorCode": vendor["code"],
-                "fetch-static-data": 1,
-            }
-        )
-        data = respnose.json()['data']
-        snappfood_full_vendors_collection.with_options(write_concern=WriteConcern(w=0)).insert_many(data['vendor'], ordered=False)
-        products = [i | {'vendorCode': vendor['code']} for j in data['menus'] for i in j['products']]
-        snappfood_products_collection.with_options(write_concern=WriteConcern(w=0)).insert_many(products, ordered=False)
-    except Exception as err:
-        print(err)
+def produtcs():
+    vendors = snappfood_vendors_collection.find({}, {"code": True})
+    for vendor in vendors:
+        try:
+            respnose = session.get(
+                f"https://snappfood.ir/mobile/v2/restaurant/details/dynamic",
+                params={
+                    "optionalClient": "WEBSITE",
+                    "vendorCode": vendor["code"],
+                    "fetch-static-data": 1,
+                }
+            )
+            data = respnose.json()['data']
+            snappfood_full_vendors_collection.with_options(write_concern=WriteConcern(w=0)).insert_one(data['vendor'])
+            products = [i | {'vendorCode': vendor['code']} for j in data['menus'] for i in j['products']]
+            if products:
+                snappfood_products_collection.with_options(write_concern=WriteConcern(w=0)).insert_many(products, ordered=False)
+        except Exception as err:
+            print(err)
+
+
+if __name__ == "__main__":
+    produtcs()
